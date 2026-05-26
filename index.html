@@ -17,7 +17,7 @@
         header p { margin: 5px 0 0 0; font-style: italic; opacity: 0.9; }
         
         .container { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; padding: 20px; max-width: 1500px; margin: 0 auto; }
-        @media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
+        @media (max-width: 1100px) { .container { grid-template-columns: 1fr; } }
         
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-top: 3px solid var(--primary-color); height: fit-content; }
         .card h2 { margin-top: 0; font-size: 18px; color: var(--primary-color); border-bottom: 1px solid #eee; padding-bottom: 10px; }
@@ -33,9 +33,11 @@
         .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; flex-wrap: wrap; }
         .search-box { flex: 1; min-width: 200px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         
-        .task-table { width: 100%; border-collapse: collapse; background: white; font-size: 14px; }
-        .task-table th, .task-table td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
-        .task-table th { background-color: #f1f1f1; color: var(--primary-color); position: sticky; top: 0; }
+        /* CẤU HÌNH THAY ĐỔI: Bảng tự ngắt dòng chuẩn đẹp, không tràn viền */
+        .table-wrapper { overflow-x: auto; max-height: 600px; border: 1px solid #ddd; border-radius: 4px; }
+        .task-table { width: 100%; border-collapse: collapse; background: white; font-size: 14px; table-layout: fixed; }
+        .task-table th, .task-table td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; word-break: break-word; white-space: normal; }
+        .task-table th { background-color: #f1f1f1; color: var(--primary-color); position: sticky; top: 0; z-index: 5; }
         
         .badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block; text-align: center; }
         .badge-pending { background-color: #ffeeba; color: #856404; }
@@ -98,15 +100,15 @@
             </div>
         </div>
 
-        <div style="overflow-x: auto; max-height: 600px;">
+        <div class="table-wrapper">
             <table class="task-table">
                 <thead>
                     <tr>
-                        <th>Nội dung Văn bản & Chỉ đạo</th>
-                        <th style="width: 150px;">Người tham mưu</th>
-                        <th style="width: 100px;">Hạn chót</th>
-                        <th style="width: 120px;">Trạng thái</th>
-                        <th style="width: 100px;">Thao tác</th>
+                        <th style="width: 45%;">Nội dung Văn bản & Chỉ đạo</th>
+                        <th style="width: 25%;">Người tham mưu</th>
+                        <th style="width: 12%;">Hạn chót</th>
+                        <th style="width: 11%;">Trạng thái</th>
+                        <th style="width: 7%;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody id="taskGrid">
@@ -120,16 +122,12 @@
 </div>
 
 <script>
-    // ĐƯỜNG LINK GOOGLE APPS SCRIPT CỦA BẠN
     const API_URL = "https://script.google.com/macros/s/AKfycbzRE2OfMZ6Kt2QEtRts4yBenYgSyF42b2kRs4KD46bINvgvZHojEZXcuXguvkgOdtAl/exec";
     
     let globalData = [];
 
-    // 1. Hàm đọc dữ liệu từ Trang tính lên giao diện
-    // MỚI ĐÃ SỬA LỖI:
-    // DÁN ĐOẠN MỚI NÀY VÀO:
+    // 1. Hàm đọc dữ liệu từ Trang tính lên giao diện (JSONP)
     function loadData() {
-        // Tạo hàm tạm xử lý dữ liệu trả về từ kết nối an toàn
         window.handleGoogleData = function(data) {
             globalData = data;
             filterAndRender();
@@ -139,7 +137,6 @@
 
         const script = document.createElement('script');
         script.id = 'jsonp-script';
-        // Gọi dữ liệu thông qua cơ chế bắc cầu callback công khai
         script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + 'callback=handleGoogleData';
         
         script.onerror = function() {
@@ -155,11 +152,10 @@
         grid.innerHTML = '';
         
         if(data.length === 0) {
-            grid.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999;">Không có dữ liệu văn bản nào phù hợp.</td></tr>`;
+            grid.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color:#999;">Không có dữ liệu văn bản nào phù hợp.</td></tr>`;
             return;
         }
 
-        // Đảo ngược danh sách để văn bản mới nhất hiển thị lên đầu bảng
         const displayData = [...data].reverse();
 
         displayData.forEach(item => {
@@ -167,14 +163,12 @@
             if(item.status === 'Đang thực hiện') badgeClass = 'badge-progress';
             if(item.status === 'Đã hoàn thành') badgeClass = 'badge-done';
 
-            // Định dạng ngày hiển thị (DD/MM/YYYY)
             let formattedDeadline = item.deadline;
-            if(item.deadline) {
+            if(item.deadline && item.deadline.includes('-')) {
                 const parts = item.deadline.split('-');
                 if(parts.length === 3) formattedDeadline = `${parts[2]}/${parts[1]}/${parts[0]}`;
             }
 
-            // Kiểm tra trễ hạn
             const isOverdue = new Date(item.deadline) < new Date() && item.status !== 'Đã hoàn thành';
 
             grid.innerHTML += `
@@ -183,7 +177,7 @@
                         <strong>${item.title}</strong><br>
                         <small style="color:#e65c00; font-weight:500;">✍️ <em>Chỉ đạo: ${item.instruction}</em></small>
                         ${item.progressNote ? `<br><small style="color:#004085; font-weight:bold;">💬 Tiến độ: ${item.progressNote}</small>` : ''}
-                        ${item.file && item.file !== "#" ? `<br><a href="${item.file}" target="_blank" style="font-size:12px; color: #155724; font-weight:bold;">📁 Xem văn bản đính kèm</a>` : ''}
+                        ${item.file && item.file !== "#" ? `<br><a href="${item.file}" target="_blank" style="font-size:12px; color: #155724; font-weight:bold; text-decoration: none;">📁 Xem văn bản đính kèm ↗</a>` : ''}
                     </td>
                     <td><span style="font-size:13px; font-weight:500;">${item.assignee}</span></td>
                     <td><span style="color: ${isOverdue ? 'red' : 'black'}; font-weight: bold;">${formattedDeadline}</span></td>
@@ -204,7 +198,7 @@
         submitBtn.innerText = "⏳ Đang gửi dữ liệu lên hệ thống...";
 
         const newItem = {
-            id: "VB-" + Date.now(), // Tạo ID ngẫu nhiên không trùng lặp
+            id: "VB-" + Date.now(),
             title: document.getElementById('title').value,
             instruction: document.getElementById('instruction').value,
             assignee: document.getElementById('assignee').value,
@@ -217,14 +211,13 @@
         try {
             await fetch(API_URL, {
                 method: "POST",
-                mode: "no-cors", // Tránh lỗi CORS trên trình duyệt nội bộ
+                mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(newItem)
             });
             
             alert("🎉 Đã phát hành văn bản và giao việc thành công lên hệ thống!");
             document.getElementById('docForm').reset();
-            // Đợi 1.5 giây rồi tải lại dữ liệu để hệ thống đồng bộ kịp
             setTimeout(loadData, 1500);
         } catch (error) {
             alert("❌ Gặp lỗi khi lưu. Hãy thử lại!");
@@ -235,12 +228,12 @@
         }
     });
 
-    // 4. Thành viên tham mưu click cập nhật trạng thái & tiến độ
-    async function openUpdateDialog(id, currentStatus, currentNote) {
+    // 4. SỬA ĐỔI CHÍNH: Thành viên tham mưu cập nhật trạng thái thông qua cơ chế thẻ Script (JSONP) không bị chặn CORS
+    function openUpdateDialog(id, currentStatus, currentNote) {
         const statusPrompt = prompt("Nhập số ứng với Trạng thái mới:\n1: Chưa thực hiện\n2: Đang thực hiện\n3: Đã hoàn thành", 
             currentStatus === "Chưa thực hiện" ? "1" : currentStatus === "Đang thực hiện" ? "2" : "3");
         
-        if (statusPrompt === null) return; // Nhấn Hủy
+        if (statusPrompt === null) return; 
 
         let newStatus = "";
         if (statusPrompt === "1") newStatus = "Chưa thực hiện";
@@ -249,21 +242,30 @@
         else { alert("Lựa chọn không hợp lệ!"); return; }
 
         const newNote = prompt("Nhập nội dung/kết quả đã tham mưu thực hiện đến hiện tại:", currentNote);
-        if (newNote === null) return; // Nhấn Hủy
+        if (newNote === null) return; 
 
-        // Gửi lệnh cập nhật lên Google Sheets thông qua tham số URL
-        const updateUrl = `${API_URL}?action=update&id=${id}&status=${encodeURIComponent(newStatus)}&progressNote=${encodeURIComponent(newNote)}`;
+        document.getElementById('taskGrid').innerHTML = `<tr><td colspan="5" class="loading" style="color: blue;">⏳ Hệ thống đang ghi nhận kết quả và cập nhật lại Trang tính...</td></tr>`;
+
+        // Khởi tạo thẻ kết nối bắc cầu JSONP gửi lệnh sửa đổi sang Google Sheets
+        const script = document.createElement('script');
+        script.id = 'jsonp-update-script';
         
-        document.getElementById('taskGrid').innerHTML = `<tr><td colspan="5" class="loading">⏳ Đang ghi nhận cập nhật tiến độ lên Trang tính...</td></tr>`;
+        // Tạo hàm tạm thời đón nhận tín hiệu hoàn tất từ máy chủ
+        window.handleUpdateResponse = function() {
+            alert("✅ Thành viên đã cập nhật tiến độ công việc thành công!");
+            script.remove();
+            loadData(); // Tải lại bảng dữ liệu mới nhất
+        };
 
-        try {
-            await fetch(updateUrl, { method: "POST", mode: "no-cors" });
-            alert("✅ Cập nhật tiến độ thành công!");
-            setTimeout(loadData, 1500);
-        } catch (error) {
-            alert("❌ Lỗi cập nhật tiến độ!");
+        // Kích hoạt đường dẫn tích hợp đầy đủ hành động, ID văn bản và nội dung sửa đổi
+        script.src = API_URL + `?action=update&id=${id}&status=${encodeURIComponent(newStatus)}&progressNote=${encodeURIComponent(newNote)}&callback=handleUpdateResponse`;
+        
+        script.onerror = function() {
+            alert("❌ Lỗi mạng. Không thể kết nối cập nhật dữ liệu!");
             loadData();
-        }
+        };
+
+        document.body.appendChild(script);
     }
 
     // 5. Bộ lọc và Tìm kiếm thời gian thực
@@ -283,7 +285,6 @@
         renderTable(filtered);
     }
 
-    // Khởi chạy phần mềm lần đầu để kéo dữ liệu từ Google Sheets về
     loadData();
 </script>
 
