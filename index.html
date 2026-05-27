@@ -264,7 +264,329 @@
             alert("❌ Lỗi mạng. Không thể kết nối cập nhật dữ liệu!");
             loadData();
         };
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phần mềm Theo dõi Văn bản & Chỉ đạo - VPĐU / UBND</title>
+    <style>
+        :root {
+            --primary-color: #a80000; /* Màu đỏ Đảng ủy / Chính phủ */
+            --secondary-color: #f4c430; /* Vàng */
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); }
+        header { background-color: var(--primary-color); color: white; padding: 15px 20px; text-align: center; border-bottom: 4px solid var(--secondary-color); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
+        header p { margin: 5px 0 0 0; font-style: italic; opacity: 0.9; }
+        
+        .container { display: grid; grid-template-columns: 1fr 2.2fr; gap: 20px; padding: 20px; max-width: 1600px; margin: 0 auto; }
+        @media (max-width: 1100px) { .container { grid-template-columns: 1fr; } }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-top: 3px solid var(--primary-color); height: fit-content; }
+        .card h2 { margin-top: 0; font-size: 18px; color: var(--primary-color); border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        /* PHÂN HỆ MỚI: Hệ thống Dashboard thống kê KPI */
+        .kpi-dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        @media (max-width: 600px) { .kpi-dashboard { grid-template-columns: 1fr 1fr; } }
+        .kpi-box { padding: 15px; border-radius: 6px; text-align: center; color: white; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .kpi-total { background-color: #4e73df; }
+        .kpi-pending { background-color: #f6c23e; color: #333; }
+        .kpi-progress { background-color: #36b9cc; }
+        .kpi-done { background-color: #1cc88a; }
+        .kpi-box num { display: block; font-size: 28px; margin-top: 5px; font-family: 'Courier New', Courier, monospace; }
 
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
+        
+        .btn { background-color: var(--primary-color); color: white; border: none; padding: 12px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; font-size: 15px; }
+        .btn:hover { background-color: #800000; }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 200px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .table-wrapper { overflow-x: auto; max-height: 600px; border: 1px solid #ddd; border-radius: 4px; }
+        .task-table { width: 100%; border-collapse: collapse; background: white; font-size: 14px; table-layout: fixed; }
+        .task-table th, .task-table td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; word-break: break-word; white-space: normal; }
+        .task-table th { background-color: #f1f1f1; color: var(--primary-color); position: sticky; top: 0; z-index: 5; }
+        
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block; text-align: center; }
+        .badge-pending { background-color: #ffeeba; color: #856404; }
+        .badge-progress { background-color: #b8daff; color: #004085; }
+        .badge-done { background-color: #c3e6cb; color: #155724; }
+        
+        .action-btn { background: none; border: 1px solid var(--primary-color); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: var(--primary-color); font-weight: bold; }
+        .action-btn:hover { background-color: #fff5f5; }
+        
+        .loading { text-align: center; padding: 20px; font-style: italic; color: #666; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Hệ thống Quản lý Văn bản & Theo dõi Chỉ đạo Công việc nội bộ</h1>
+    <p>Áp dụng cho Đảng Ủy - HĐND - UBND | Đôn đốc chủ động, Đánh giá chất lượng tham mưu</p>
+</header>
+
+<div class="container">
+    <div class="card">
+        <h2>📝 Tiếp nhận & Chỉ đạo của Lãnh đạo</h2>
+        <form id="docForm">
+            <div class="form-group">
+                <label>Tiêu đề / Trích yếu Văn bản hoặc Kết luận cuộc họp:</label>
+                <textarea id="title" rows="3" placeholder="Ví dụ: Thông báo kết luận số 45-TB/ĐU của Thường trực Đảng ủy về công tác chuẩn bị Đại hội..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Ý kiến chỉ đạo / Bút phê giao việc:</label>
+                <textarea id="instruction" rows="3" placeholder="Ví dụ: Giao Tổ tuyên giáo chủ trì khởi thảo đề cương tuyên truyền trực quan..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Thành viên / Bộ phận chuyên môn tham mưu:</label>
+                <input type="text" id="assignee" placeholder="Ví dụ: Đ/c Nguyễn Văn A / Tổ Tuyên giáo" required>
+            </div>
+            <div class="form-group">
+                <label>Hạn hoàn thành công việc (Deadline):</label>
+                <input type="date" id="deadline" required>
+            </div>
+            <div class="form-group">
+                <label>Đính kèm File gốc (Link Google Drive quét văn bản):</label>
+                <input type="url" id="fileLink" placeholder="Dán đường link file PDF hoặc văn bản quét vào đây...">
+            </div>
+            <button type="submit" id="submitBtn" class="btn">🚀 Phát hành & Giao việc hệ thống</button>
+        </form>
+    </div>
+
+    <div>
+        <div class="kpi-dashboard">
+            <div class="kpi-box kpi-total">🗂️ TỔNG CÔNG VIỆC <num id="countTotal">0</num></div>
+            <div class="kpi-box kpi-pending">⏳ CHƯA THỰC HIỆN <num id="countPending">0</num></div>
+            <div class="kpi-box kpi-progress">🔄 ĐANG THỰC HIỆN <num id="countProgress">0</num></div>
+            <div class="kpi-box kpi-done">✅ ĐÃ HOÀN THÀNH <num id="countDone">0</num></div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Danh sách Đôn đốc & Tiến độ Thực hiện Nhiệm vụ</h2>
+            <div class="toolbar">
+                <input type="text" class="search-box" id="search" placeholder="🔍 Tìm nhanh theo trích yếu văn bản hoặc người tham mưu...">
+                <div>
+                    <strong>Bộ lọc nhanh: </strong>
+                    <select id="filterStatus" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc;">
+                        <option value="Tất cả">Tất cả trạng thái</option>
+                        <option value="Chưa thực hiện">Chưa thực hiện</option>
+                        <option value="Đang thực hiện">Đang thực hiện</option>
+                        <option value="Đã hoàn thành">Đã hoàn thành</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="task-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 48%;">Nội dung Văn bản & Ý kiến chỉ đạo</th>
+                            <th style="width: 24%;">Bộ phận tham mưu</th>
+                            <th style="width: 12%;">Hạn chót</th>
+                            <th style="width: 11%;">Trạng thái</th>
+                            <th style="width: 5%;">Sửa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskGrid">
+                        <tr>
+                            <td colspan="5" class="loading">🔄 Đang tải dữ liệu trực tuyến từ Google Sheets...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ĐIỀN ĐƯỜNG LINK WEB APP APPS SCRIPT CỦA BẠN VÀO ĐÂY
+    const API_URL = "https://script.google.com/macros/s/AKfycbzRE2OfMZ6Kt2QEtRts4yBenYgSyF42b2kRs4KD46bINvgvZHojEZXcuXguvkgOdtAl/exec";
+    
+    let globalData = [];
+
+    // 1. Hàm tính toán và cập nhật các con số trên Dashboard KPI tự động
+    function updateKPIDashboard(data) {
+        let total = data.length;
+        let pending = data.filter(item => item.status === "Chưa thực hiện" || !item.status).length;
+        let progress = data.filter(item => item.status === "Đang thực hiện").length;
+        let done = data.filter(item => item.status === "Đã hoàn thành").length;
+
+        document.getElementById('countTotal').innerText = total;
+        document.getElementById('countPending').innerText = pending;
+        document.getElementById('countProgress').innerText = progress;
+        document.getElementById('countDone').innerText = done;
+    }
+
+    // 2. Hàm đọc dữ liệu thông qua cơ chế JSONP
+    function loadData() {
+        window.handleGoogleData = function(data) {
+            globalData = data;
+            updateKPIDashboard(data); // Tính toán KPI
+            filterAndRender();
+            const oldScript = document.getElementById('jsonp-script');
+            if (oldScript) oldScript.remove();
+        };
+
+        const script = document.createElement('script');
+        script.id = 'jsonp-script';
+        script.src = API_URL + (API_URL.includes('?') ? '&' : '?') + 'callback=handleGoogleData';
+        
+        script.onerror = function() {
+            document.getElementById('taskGrid').innerHTML = `<tr><td colspan="5" style="color:red; text-align:center;">⚠️ Lỗi kết nối dữ liệu. Vui lòng kiểm tra lại cấu hình mạng!</td></tr>`;
+        };
+
+        document.body.appendChild(script);
+    }
+
+    // 3. Hàm kết xuất dữ liệu ra bảng giao diện công việc
+    function renderTable(data) {
+        const grid = document.getElementById('taskGrid');
+        grid.innerHTML = '';
+        
+        if(data.length === 0) {
+            grid.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color:#999;">Không có dữ liệu văn bản nào phù hợp.</td></tr>`;
+            return;
+        }
+
+        const displayData = [...data].reverse();
+
+        displayData.forEach(item => {
+            let badgeClass = 'badge-pending';
+            if(item.status === 'Đang thực hiện') badgeClass = 'badge-progress';
+            if(item.status === 'Đã hoàn thành') badgeClass = 'badge-done';
+
+            let formattedDeadline = item.deadline;
+            if(item.deadline && item.deadline.includes('-')) {
+                const parts = item.deadline.split('-');
+                if(parts.length === 3) formattedDeadline = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+
+            const isOverdue = new Date(item.deadline) < new Date() && item.status !== 'Đã hoàn thành';
+
+            grid.innerHTML += `
+                <tr>
+                    <td>
+                        <strong>${item.title}</strong><br>
+                        <small style="color:#e65c00; font-weight:500;">✍️ <em>Chỉ đạo: ${item.instruction}</em></small>
+                        ${item.progressNote ? `<br><small style="color:#004085; font-weight:bold;">💬 Tiến độ: ${item.progressNote}</small>` : ''}
+                        ${item.file && item.file !== "#" ? `<br><a href="${item.file}" target="_blank" style="font-size:12px; color: #155724; font-weight:bold; text-decoration: none;">📁 Xem văn bản đính kèm ↗</a>` : ''}
+                    </td>
+                    <td><span style="font-size:13px; font-weight:500;">${item.assignee}</span></td>
+                    <td><span style="color: ${isOverdue ? 'red' : 'black'}; font-weight: bold;">${formattedDeadline}</span></td>
+                    <td><span class="badge ${badgeClass}">${item.status || 'Chưa thực hiện'}</span></td>
+                    <td>
+                        <button class="action-btn" onclick="openUpdateDialog('${item.id}', '${item.status}', \`${item.progressNote || ''}\`)">✍️</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // 4. Gửi yêu cầu thêm văn bản chỉ đạo mới từ Văn phòng (POST)
+    document.getElementById('docForm').addEventListener('submit', async function(e){
+        e.preventDefault();
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerText = "⏳ Đang đồng bộ lên hệ thống...";
+
+        const newItem = {
+            id: "VB-" + Date.now(),
+            title: document.getElementById('title').value,
+            instruction: document.getElementById('instruction').value,
+            assignee: document.getElementById('assignee').value,
+            deadline: document.getElementById('deadline').value,
+            status: "Chưa thực hiện",
+            file: document.getElementById('fileLink').value || "#",
+            progressNote: ""
+        };
+
+        try {
+            await fetch(API_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newItem)
+            });
+            
+            alert("🎉 Đã phát hành văn bản chỉ đạo và phân phối việc thành công!");
+            document.getElementById('docForm').reset();
+            setTimeout(loadData, 1500);
+        } catch (error) {
+            alert("❌ Gặp lỗi khi gửi dữ liệu hệ thống. Hãy kiểm tra mạng!");
+            console.error(error);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "🚀 Phát hành & Giao việc hệ thống";
+        }
+    });
+
+    // 5. Hàm nhận phản hồi JSONP toàn cục báo cập nhật thành công từ Google Sheets
+    window.handleUpdateResponse = function(response) {
+        alert("✅ Thành viên đã báo cáo tiến độ và cập nhật dữ liệu thành công!");
+        const oldScript = document.getElementById('jsonp-update-script');
+        if (oldScript) oldScript.remove();
+        loadData(); // Gọi hàm cập nhật lại Dashboard thống kê và bảng tiến độ mới nhất
+    };
+
+    // 6. Mở hộp thoại để cán bộ chuyên môn báo cáo tiến độ/kết quả thực hiện văn bản
+    function openUpdateDialog(id, currentStatus, currentNote) {
+        const statusPrompt = prompt("Nhập số tương ứng với trạng thái thực hiện mới:\n1: Chưa thực hiện\n2: Đang thực hiện\n3: Đã hoàn thành", 
+            currentStatus === "Chưa thực hiện" ? "1" : currentStatus === "Đang thực hiện" ? "2" : "3");
+        
+        if (statusPrompt === null) return; 
+
+        let newStatus = "";
+        if (statusPrompt === "1") newStatus = "Chưa thực hiện";
+        else if (statusPrompt === "2") newStatus = "Đang thực hiện";
+        else if (statusPrompt === "3") newStatus = "Đã hoàn thành";
+        else { alert("Lựa chọn mã số không hợp lệ!"); return; }
+
+        const newNote = prompt("Nhập kết quả tham mưu / nội dung tiến độ thực hiện công việc:", currentNote);
+        if (newNote === null) return; 
+
+        document.getElementById('taskGrid').innerHTML = `<tr><td colspan="5" class="loading" style="color: blue;">⏳ Hệ thống đang xử lý và phân tích số liệu trên Trang tính...</td></tr>`;
+
+        const script = document.createElement('script');
+        script.id = 'jsonp-update-script';
+        script.src = API_URL + `?action=update&id=${id}&status=${encodeURIComponent(newStatus)}&progressNote=${encodeURIComponent(newNote)}&callback=handleUpdateResponse`;
+        
+        script.onerror = function() {
+            alert("❌ Không thể kết nối đến máy chủ cập nhật!");
+            loadData();
+        };
+
+        document.body.appendChild(script);
+    }
+
+    // 7. Bộ lọc và Tìm kiếm thông minh thời gian thực
+    document.getElementById('search').addEventListener('input', filterAndRender);
+    document.getElementById('filterStatus').addEventListener('change', filterAndRender);
+
+    function filterAndRender() {
+        const searchKeyword = document.getElementById('search').value.toLowerCase();
+        const statusFilter = document.getElementById('filterStatus').value;
+
+        let filtered = globalData.filter(item => {
+            const matchesSearch = (item.title && item.title.toLowerCase().includes(searchKeyword)) || 
+                                  (item.assignee && item.assignee.toLowerCase().includes(searchKeyword));
+            const matchesStatus = (statusFilter === "Tất cả") || (item.status === statusFilter);
+            return matchesSearch && matchesStatus;
+        });
+        renderTable(filtered);
+    }
+
+    loadData();
+</script>
+
+</body>
+</html>
         document.body.appendChild(script);
     }
 
