@@ -36,6 +36,8 @@
         .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
         
+        .security-badge { background-color: #fff0f0; color: #c00; padding: 10px; border-radius: 4px; border: 1px dashed #c00; margin-bottom: 15px; font-size: 13px; font-weight: 500; }
+
         .btn { background-color: var(--primary-color); color: white; border: none; padding: 12px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; font-size: 15px; }
         .btn:hover { background-color: #800000; }
         .btn:disabled { background-color: #ccc; cursor: not-allowed; }
@@ -69,6 +71,7 @@
 <div class="container">
     <div class="card">
         <h2>📝 Tiếp nhận & Chỉ đạo của Lãnh đạo</h2>
+        <div class="security-badge">🔒 Khu vực bảo mật dành riêng cho Ban Lãnh đạo / Văn phòng</div>
         <form id="docForm">
             <div class="form-group">
                 <label>Tiêu đề / Trích yếu Văn bản hoặc Kết luận cuộc họp:</label>
@@ -89,6 +92,10 @@
             <div class="form-group">
                 <label>Đính kèm File gốc (Link Google Drive quét văn bản):</label>
                 <input type="url" id="fileLink" placeholder="Dán đường link file PDF hoặc văn bản quét vào đây...">
+            </div>
+            <div class="form-group">
+                <label style="color: var(--primary-color);">🔑 Mã xác thực Văn phòng để giao việc:</label>
+                <input type="password" id="officeKey" placeholder="Nhập mật mã của Văn phòng để phát hành..." required>
             </div>
             <button type="submit" id="submitBtn" class="btn">🚀 Phát hành & Giao việc hệ thống</button>
         </form>
@@ -142,7 +149,30 @@
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbzRE2OfMZ6Kt2QEtRts4yBenYgSyF42b2kRs4KD46bINvgvZHojEZXcuXguvkgOdtAl/exec";
     
+    // -------------------------------------------------------------
+    // CẤU HÌNH BẢO MẬT: BẠN CÓ THỂ SỬA ĐỔI CÁC MÃ PIN Ở ĐÂY THEO Ý MÌNH
+    // -------------------------------------------------------------
+    const SECRET_OFFICE_PIN = "2026"; // Mã PIN dùng cho Văn phòng giao việc
+
+    const CANBO_PIN_DIRECTORY = {
+        "nguyenvanan": "1111", // Đ/c Nguyễn Văn An dùng mã 1111
+        "lethithu":    "2222", // Đ/c Lê Thị Thu dùng mã 2222
+        "tranvanhung": "3333", // Đ/c Trần Văn Hùng dùng mã 3333
+        "lehoanganh":  "4444", // Đ/c Lê Hoàng Anh dùng mã 4444
+        "tranthimai":  "5555"  // Đ/c Trần Thị Mai dùng mã 5555
+    };
+    // -------------------------------------------------------------
+
     let globalData = [];
+
+    // Hàm chuẩn hóa loại bỏ dấu, khoảng trắng tên tiếng Việt để so khớp chính xác mã PIN
+    function cleanName(name) {
+        if (!name) return "";
+        return name.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d")
+            .replace(/[^a-z0-9]/g, "");
+    }
 
     function updateKPIDashboard(data) {
         let total = data.length;
@@ -212,15 +242,23 @@
                     <td><span style="color: ${isOverdue ? 'red' : 'black'}; font-weight: bold;">${formattedDeadline}</span></td>
                     <td><span class="badge ${badgeClass}">${item.status || 'Chưa thực hiện'}</span></td>
                     <td>
-                        <button class="action-btn" onclick="openUpdateDialog('${item.id}', '${item.status}', \`${item.progressNote || ''}\`)">✍️</button>
+                        <button class="action-btn" onclick="openUpdateDialog('${item.id}', '${item.status}', \`${item.progressNote || ''}\`, '${item.assignee}')">✍️</button>
                     </td>
                 </tr>
             `;
         });
     }
 
+    // GIAO VIỆC MỚI CÓ KIỂM TRA MÃ XÁC THỰC VĂN PHÒNG
     document.getElementById('docForm').addEventListener('submit', async function(e){
         e.preventDefault();
+        
+        const inputKey = document.getElementById('officeKey').value;
+        if (inputKey !== SECRET_OFFICE_PIN) {
+            alert("❌ MÃ XÁC THỰC VĂN PHÒNG KHÔNG ĐÚNG! Lệnh giao việc bị từ chối.");
+            return;
+        }
+
         const submitBtn = document.getElementById('submitBtn');
         submitBtn.disabled = true;
         submitBtn.innerText = "⏳ Đang đồng bộ lên hệ thống...";
@@ -244,7 +282,7 @@
                 body: JSON.stringify(newItem)
             });
             
-            alert("🎉 Đã phát hành văn bản chỉ đạo và phân phối việc thành công!");
+            alert("🎉 Đã xác thực thành công! Văn bản chỉ đạo đã được phân phối xuống đơn vị.");
             document.getElementById('docForm').reset();
             setTimeout(loadData, 1500);
         } catch (error) {
@@ -257,13 +295,37 @@
     });
 
     window.handleUpdateResponse = function(response) {
-        alert("✅ Thành viên đã báo cáo tiến độ và cập nhật dữ liệu thành công!");
+        alert("✅ Xác thực thành công! Tiến độ công việc đã được ghi nhận.");
         const oldScript = document.getElementById('jsonp-update-script');
         if (oldScript) oldScript.remove();
         loadData();
     };
 
-    function openUpdateDialog(id, currentStatus, currentNote) {
+    // CẬP NHẬT TIẾN ĐỘ CÓ ĐỐI CHIẾU MÃ PIN CÁ NHÂN THEO TÊN CÁN BỘ CHỦ TRÌ
+    function openUpdateDialog(id, currentStatus, currentNote, assigneeName) {
+        const cleanedAssignee = cleanName(assigneeName);
+        let correctPin = "";
+        
+        for (let key in CANBO_PIN_DIRECTORY) {
+            if (cleanedAssignee.includes(key)) {
+                correctPin = CANBO_PIN_DIRECTORY[key];
+                break;
+            }
+        }
+
+        if (!correctPin) {
+            alert("⚠️ Hệ thống chưa thiết lập mã PIN riêng định danh cho: " + assigneeName + "\nVui lòng thông báo Văn phòng cập nhật!");
+            return;
+        }
+
+        const userPin = prompt("🔒 XÁC THỰC AN NINH CÁN BỘ:\nNhập mã PIN cá nhân của " + assigneeName + " để cập nhật tiến độ:");
+        if (userPin === null) return;
+        
+        if (userPin !== correctPin) {
+            alert("❌ TRUY CẬP TRÁI PHÉP!\nMã PIN không khớp với cán bộ/bộ phận được giao chủ trì. Bạn không thể sửa công việc của người khác!");
+            return;
+        }
+
         const statusPrompt = prompt("Nhập số tương ứng với trạng thái thực hiện mới:\n1: Chưa thực hiện\n2: Đang thực hiện\n3: Đã hoàn thành", 
             currentStatus === "Chưa thực hiện" ? "1" : currentStatus === "Đang thực hiện" ? "2" : "3");
         
